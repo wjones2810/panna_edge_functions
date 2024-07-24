@@ -43,30 +43,15 @@ const supabaseUrl = 'https://bbsizuvgalagwonxgivl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJic2l6dXZnYWxhZ3dvbnhnaXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjE0ODI2NzQsImV4cCI6MjAzNzA1ODY3NH0.oFWBLzwMabXe6JMrJgrfUuJUJUUhUVVVPsuSfiWa9H4'; // Replace with your actual Supabase API key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const apiUrl = 'https://api.sportmonks.com/v3/football/schedules/seasons/23584?api_token=6oOxlfu7qpicPTZpo9i0ux47MDTmszlNf8bel8TtLGW5j8hnpuL6NCL7J46j';
 
   try {
     console.log('Fetching data from SportMonks API...');
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer 6oOxlfu7qpicPTZpo9i0ux47MDTmszlNf8bel8TtLGW5j8hnpuL6NCL7J46j`, // Ensure the token is correct
-      },
-    });
-
-    console.log(`API response status: ${response.status}`);
-
-    if (!response.ok) {
-      throw new Error(`API responded with status ${response.status}: ${response.statusText}`);
-    }
-
+    const response = await fetch(apiUrl);
     const data: ApiResponse = await response.json();
 
-    console.log('API data fetched successfully:', JSON.stringify(data, null, 2));
-
-    if (!data.data || !Array.isArray(data.data)) {
-      throw new Error('Invalid API response structure');
-    }
+    console.log('API data fetched successfully');
 
     const teamMapping: { [key: string]: string } = {
       "FC Copenhagen": "05726ad6-7681-43df-92c3-d1db0b14eece",
@@ -92,7 +77,6 @@ serve(async (req) => {
           const awayScore = fixture.scores.find((s) => s.participant_id === awayTeam?.id)?.score.goals ?? null;
 
           return {
-            fixture_id: crypto.randomUUID(),
             api_fixture_id: fixture.id,
             home_team_id: homeTeam ? teamMapping[homeTeam.name] : null,
             away_team_id: awayTeam ? teamMapping[awayTeam.name] : null,
@@ -101,7 +85,8 @@ serve(async (req) => {
             finished_status: homeScore !== null,
             game_week: round.id,
             start_time: fixture.starting_at,
-            end_time: fixture.ending_at
+            end_time: fixture.ending_at,
+            last_updated_at: new Date().toISOString()
           };
         })
       )
@@ -109,25 +94,81 @@ serve(async (req) => {
 
     console.log('Transformed fixtures data:', JSON.stringify(fixtures, null, 2));
 
-    console.log('Inserting data into Supabase...');
-    const { data: insertData, error: insertError } = await supabase
-      .from('fixtures')
-      .insert(fixtures);
+    for (const fixture of fixtures) {
+      const { data: existingFixture, error: fetchError } = await supabase
+        .from('fixtures')
+        .select('api_fixture_id, home_team_id, away_team_id, home_team_score, away_team_score, finished_status, game_week, start_time, end_time')
+        .eq('api_fixture_id', fixture.api_fixture_id)
+        .single();
 
-    if (insertError) {
-      console.error('Error inserting data:', insertError.message);
-      throw new Error(`Error inserting data: ${insertError.message}`);
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching existing fixture:', fetchError);
+        return new Response('Error fetching existing fixture', {
+          headers: { 'Content-Type': 'text/plain' },
+          status: 500
+        });
+      }
+
+      if (existingFixture) {
+        const hasChanges = 
+          existingFixture.home_team_id !== fixture.home_team_id ||
+          existingFixture.away_team_id !== fixture.away_team_id ||
+          existingFixture.home_team_score !== fixture.home_team_score ||
+          existingFixture.away_team_score !== fixture.away_team_score ||
+          existingFixture.finished_status !== fixture.finished_status ||
+          existingFixture.game_week !== fixture.game_week ||
+          existingFixture.start_time !== fixture.start_time ||
+          existingFixture.end_time !== fixture.end_time;
+
+        if (hasChanges) {
+          const { error: updateError } = await supabase
+            .from('fixtures')
+            .update({
+              home_team_id: fixture.home_team_id,
+              away_team_id: fixture.away_team_id,
+              home_team_score: fixture.home_team_score,
+              away_team_score: fixture.away_team_score,
+              finished_status: fixture.finished_status,
+              game_week: fixture.game_week,
+              start_time: fixture.start_time,
+              end_time: fixture.end_time,
+              last_updated_at: new Date().toISOString()
+            })
+            .eq('api_fixture_id', fixture.api_fixture_id);
+
+          if (updateError) {
+            console.error('Error updating fixture:', updateError);
+            return new Response('Error updating fixture', {
+              headers: { 'Content-Type': 'text/plain' },
+              status: 500
+            });
+          }
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('fixtures')
+          .insert({
+            fixture_id: crypto.randomUUID(),
+            ...fixture
+          });
+
+        if (insertError) {
+          console.error('Error inserting new fixture:', insertError);
+          return new Response('Error inserting new fixture', {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 500
+          });
+        }
+      }
     }
 
-    console.log('Data inserted successfully:', JSON.stringify(insertData, null, 2));
-
-    return new Response(JSON.stringify({ fixtures: insertData }), {
-      headers: { 'Content-Type': 'application/json' }
+    return new Response('Fixtures updated successfully', {
+      headers: { 'Content-Type': 'text/plain' }
     });
   } catch (error) {
-    console.error('Error occurred:', error);
+    console.error('Error fetching API:', error);
 
-    return new Response(`Error: ${error.message}`, {
+    return new Response('Error fetching API', {
       headers: { 'Content-Type': 'text/plain' },
       status: 500
     });
