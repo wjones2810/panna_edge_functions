@@ -1,8 +1,8 @@
 import { serve } from 'https://deno.land/std@0.114.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const supabaseUrl = 'https://bbsizuvgalagwonxgivl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJic2l6dXZnYWxhZ3dvbnhnaXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjE0ODI2NzQsImV4cCI6MjAzNzA1ODY3NH0.oFWBLzwMabXe6JMrJgrfUuJUJUUhUVVVPsuSfiWa9H4'; // Replace with your actual Supabase API key
+const supabaseUrl = 'https://qistxzomdskcjbjioitk.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpc3R4em9tZHNrY2piamlvaXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIwMDc2MjgsImV4cCI6MjAzNzU4MzYyOH0.BIUebpgRzkm455IbXgUn9Qd7FMWbWs4dBVEysU5oFKQ'; // Replace with your actual Supabase API key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Fixture {
@@ -19,7 +19,7 @@ interface Fixture {
 }
 
 interface Standing {
-  team_id: string;
+  standings_team_id: string; // UUID string type
   team_name: string;
   played: number;
   won: number;
@@ -31,7 +31,7 @@ interface Standing {
   points: number;
 }
 
-serve(async (req) => {
+serve(async (_req) => {
   try {
     // Fetch all finished fixtures
     const { data: fixtures, error: fetchError } = await supabase
@@ -75,7 +75,7 @@ serve(async (req) => {
 
       if (!standingsMap[homeTeamId]) {
         standingsMap[homeTeamId] = {
-          team_id: homeTeamId,
+          standings_team_id: homeTeamId,
           team_name: teamNameMap[homeTeamId],
           played: 0,
           won: 0,
@@ -90,7 +90,7 @@ serve(async (req) => {
 
       if (!standingsMap[awayTeamId]) {
         standingsMap[awayTeamId] = {
-          team_id: awayTeamId,
+          standings_team_id: awayTeamId,
           team_name: teamNameMap[awayTeamId],
           played: 0,
           won: 0,
@@ -132,12 +132,25 @@ serve(async (req) => {
     }
 
     // Prepare standings array for insertion
-    const standingsArray = Object.values(standingsMap);
+    const standingsArray = Object.values(standingsMap).map((standing) => ({
+      standings_team_id: standing.standings_team_id,
+      team_name: standing.team_name,
+      played: standing.played,
+      won: standing.won,
+      drawn: standing.drawn,
+      lost: standing.lost,
+      goals_for: standing.goals_for,
+      goals_against: standing.goals_against,
+      goal_difference: standing.goal_difference,
+      points: standing.points,
+      previous_week_rank: null, // Assuming you want to initialize this as null
+      created_at: new Date().toISOString(),
+    }));
 
     // Insert/Update standings in Supabase
     const { data: insertData, error: insertError } = await supabase
-      .from('standings')
-      .upsert(standingsArray, { onConflict: ['team_id'] });
+      .from('premier_league_standings')
+      .upsert(standingsArray, { onConflict: 'standings_team_id' });
 
     if (insertError) {
       throw new Error(`Error inserting standings: ${insertError.message}`);
