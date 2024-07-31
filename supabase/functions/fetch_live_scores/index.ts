@@ -3,6 +3,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // Hey whatsup
 
+// Hey Bro
+
 // Supabase initialization
 const supabaseUrl = 'https://bbsizuvgalagwonxgivl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpc3R4em9tZHNrY2piamlvaXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIwMDc2MjgsImV4cCI6MjAzNzU4MzYyOH0.BIUebpgRzkm455IbXgUn9Qd7FMWbWs4dBVEysU5oFKQ';
