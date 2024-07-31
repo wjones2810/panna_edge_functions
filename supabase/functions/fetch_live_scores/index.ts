@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.140.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+// Hey whatsup
+
 // Supabase initialization
 const supabaseUrl = 'https://bbsizuvgalagwonxgivl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpc3R4em9tZHNrY2piamlvaXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIwMDc2MjgsImV4cCI6MjAzNzU4MzYyOH0.BIUebpgRzkm455IbXgUn9Qd7FMWbWs4dBVEysU5oFKQ';
